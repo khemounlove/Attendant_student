@@ -410,10 +410,7 @@ createApp({
 
     // All students
     const students = ref([
-      { name: "",     sex: "ប្រុស", days: Array(7).fill(0) },
-      { name: "",   sex: "", days: Array(7).fill(0) },
-      { name: "",       sex: "", days: Array(7).fill(0) },
-      // ... add more students here (at least 30+ to test pagination)
+    
       // For testing: duplicate some entries
       ...Array(30).fill().map((_, i) => ({
         name: ` ${i + 4}`,
