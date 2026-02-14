@@ -408,18 +408,6 @@ createApp({
 
     const todayIndex = (now.getDay() + 6) % 7;
 
-    // All students
-    const students = ref([
-    
-      // For testing: duplicate some entries
-      ...Array(30).fill().map((_, i) => ({
-        name: ` ${i + 4}`,
-        sex: i % 2 === 0 ? "ប្រុស" : "ស្រី",
-        days: Array(7).fill(0),
-        weekdayPresent: 0,
-        percentage: 100
-      }))
-    ]);
 
     students.value.forEach(s => {
       s.weekdayPresent = 0;
