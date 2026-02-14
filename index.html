@@ -81,28 +81,16 @@
       outline: none;
     }
 
-    .btn-export, .btn-load-more {
+    .btn-export, .btn-load-more, .btn-clear {
       border-radius: 50px;
       padding: 12px 24px;
       font-weight: 600;
       transition: var(--transition);
     }
 
-    .btn-export {
-      background: #10b981;
-      border: none;
-      color: white;
-      box-shadow: 0 4px 14px rgba(16,185,129,0.3);
-    }
-
-    .btn-load-more {
-      background: var(--primary);
-      border: none;
-      color: white;
-      box-shadow: 0 4px 14px rgba(67,97,238,0.3);
-      margin: 30px auto;
-      display: block;
-    }
+    .btn-export { background: #10b981; border: none; color: white; box-shadow: 0 4px 14px rgba(16,185,129,0.3); }
+    .btn-load-more { background: var(--primary); border: none; color: white; box-shadow: 0 4px 14px rgba(67,97,238,0.3); margin: 30px auto; display: block; }
+    .btn-clear { background: #dc3545; border: none; color: white; margin: 20px auto; display: block; }
 
     .btn-add {
       border-radius: 50px;
@@ -113,7 +101,7 @@
       box-shadow: 0 6px 20px rgba(67,97,238,0.3);
     }
 
-    .btn-add:active, .btn-export:active, .btn-load-more:active { transform: scale(0.97); }
+    .btn-add:active, .btn-export:active, .btn-load-more:active, .btn-clear:active { transform: scale(0.97); }
 
     .student-card {
       background: var(--card-bg);
@@ -246,9 +234,9 @@
 
     .empty-message {
       text-align: center;
-      padding: 60px 20px;
+      padding: 80px 20px;
       color: var(--text-muted);
-      font-size: 1.1rem;
+      font-size: 1.2rem;
     }
 
     @media (max-width: 576px) {
@@ -294,13 +282,13 @@
     </div>
   </div>
 
-  <!-- Show message when no students -->
+  <!-- Empty state -->
   <div v-if="paginatedStudents.length === 0" class="empty-message">
     មិនទាន់មានសិស្សនៅឡើយទេ<br>
     សូមចុច <strong>+ បន្ថែម</strong> ដើម្បីបញ្ចូលសិស្សថ្មី
   </div>
 
-  <!-- Paginated student list -->
+  <!-- Student list (paginated) -->
   <div v-for="(student, idx) in paginatedStudents" :key="idx" class="student-card">
     <div class="student-header">
       <div class="student-name">{{ student.name }}</div>
@@ -344,7 +332,7 @@
     </div>
   </div>
 
-  <!-- Load More Button -->
+  <!-- Load More -->
   <div v-if="hasMore" class="load-more-container">
     <button class="btn btn-primary btn-load-more shadow" @click="loadMore">
       បង្ហាញសិស្សបន្ថែមទៀត (១៥)
@@ -362,7 +350,6 @@
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label fw-medium">ឈ្មោះសិស្ស</label>
-            <!-- Completely blank input – no placeholder example -->
             <input v-model.trim="modalName" class="form-control" required autofocus style="border-radius:12px;" placeholder="">
           </div>
           <div class="mb-3">
@@ -400,6 +387,13 @@
     </div>
   </div>
 
+  <!-- Optional: Clear All Data Button -->
+  <div class="text-center my-4">
+    <button class="btn btn-danger btn-clear" @click="clearAllData" v-if="students.length > 0">
+      លុបទិន្នន័យទាំងអស់
+    </button>
+  </div>
+
   <div id="toast-container"></div>
 
 </div>
@@ -407,12 +401,13 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-const { createApp, ref, computed } = Vue;
+const { createApp, ref, computed, watch } = Vue;
 
 createApp({
   setup() {
     const totalSchoolDays = 7;
     const pageSize = 15;
+    const STORAGE_KEY = 'attendance_students'; // key name in localStorage
 
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -421,13 +416,21 @@ createApp({
 
     const todayIndex = (now.getDay() + 6) % 7;
 
-    // Start with completely empty list – no example students
+    // Load students from localStorage (or empty array if none)
     const students = ref([]);
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        students.value = JSON.parse(saved);
+      } catch (e) {
+        console.error("Error parsing saved students", e);
+      }
+    }
 
-    students.value.forEach(s => {
-      s.weekdayPresent = 0;
-      s.percentage = 100;
-    });
+    // Save whenever students change
+    watch(students, (newStudents) => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newStudents));
+    }, { deep: true });
 
     const searchText = ref('');
     const currentPage = ref(1);
@@ -455,8 +458,6 @@ createApp({
         }, 150);
       }
     };
-
-    const filteredStudents = paginatedStudents;
 
     const exportToExcel = () => {
       if (filtered.value.length === 0) {
@@ -506,6 +507,16 @@ createApp({
       showToast("បាននាំចេញទៅ Excel រួចរាល់", "success");
     };
 
+    // Clear all data (optional reset button)
+    const clearAllData = () => {
+      if (confirm("តើអ្នកប្រាកដជាចង់លុបទិន្នន័យសិស្សទាំងអស់មែនទេ?")) {
+        students.value = [];
+        localStorage.removeItem(STORAGE_KEY);
+        currentPage.value = 1;
+        showToast("បានលុបទិន្នន័យទាំងអស់", "danger");
+      }
+    };
+
     const modalTitle = ref("បន្ថែមសិស្សថ្មី");
     const modalName = ref("");
     const modalSex = ref("ប្រុស");
@@ -513,7 +524,7 @@ createApp({
 
     const openAddModal = () => {
       modalTitle.value = "បន្ថែមសិស្សថ្មី";
-      modalName.value = "";           // Blank every time
+      modalName.value = ""; // always blank
       modalSex.value = "ប្រុស";
       editingIndex.value = -1;
       bootstrap.Modal.getOrCreateInstance(document.getElementById("studentModal")).show();
@@ -607,7 +618,8 @@ createApp({
       deleteConfirmed,
       toggleAttendance,
       exportToExcel,
-      showToast
+      showToast,
+      clearAllData
     };
   }
 }).mount('#app');
