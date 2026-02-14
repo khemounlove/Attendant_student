@@ -9,7 +9,6 @@
 
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 
-  <!-- SheetJS for Excel export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -101,7 +100,7 @@
       border: none;
       color: white;
       box-shadow: 0 4px 14px rgba(67,97,238,0.3);
-      margin: 20px auto;
+      margin: 30px auto;
       display: block;
     }
 
@@ -245,6 +244,13 @@
 
     .load-more-container { text-align: center; margin: 30px 0; }
 
+    .empty-message {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+    }
+
     @media (max-width: 576px) {
       .container-fluid { padding: 12px; }
       .day-labels, .attendance-grid { gap: 6px; }
@@ -286,6 +292,12 @@
         នាំចេញទៅ Excel
       </button>
     </div>
+  </div>
+
+  <!-- Show message when no students -->
+  <div v-if="paginatedStudents.length === 0" class="empty-message">
+    មិនទាន់មានសិស្សនៅឡើយទេ<br>
+    សូមចុច <strong>+ បន្ថែម</strong> ដើម្បីបញ្ចូលសិស្សថ្មី
   </div>
 
   <!-- Paginated student list -->
@@ -334,7 +346,7 @@
 
   <!-- Load More Button -->
   <div v-if="hasMore" class="load-more-container">
-    <button class="btn btn-primary btn-load-more" @click="loadMore">
+    <button class="btn btn-primary btn-load-more shadow" @click="loadMore">
       បង្ហាញសិស្សបន្ថែមទៀត (១៥)
     </button>
   </div>
@@ -350,7 +362,8 @@
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label fw-medium">ឈ្មោះសិស្ស</label>
-            <input v-model.trim="modalName" class="form-control" required autofocus style="border-radius:12px;">
+            <!-- Completely blank input – no placeholder example -->
+            <input v-model.trim="modalName" class="form-control" required autofocus style="border-radius:12px;" placeholder="">
           </div>
           <div class="mb-3">
             <label class="form-label fw-medium">ភេទ</label>
@@ -399,7 +412,7 @@ const { createApp, ref, computed } = Vue;
 createApp({
   setup() {
     const totalSchoolDays = 7;
-    const pageSize = 15; // show 15 students per page
+    const pageSize = 15;
 
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -408,19 +421,8 @@ createApp({
 
     const todayIndex = (now.getDay() + 6) % 7;
 
-    // All students
-    const students = ref([
- 
-      // ... add more students here (at least 30+ to test pagination)
-      // For testing: duplicate some entries
-      ...Array(30).fill().map((_, i) => ({
-        name: `សិស្ស លេខ ${i + 4}`,
-        sex: i % 2 === 0 ? "ប្រុស" : "ស្រី",
-        days: Array(7).fill(0),
-        weekdayPresent: 0,
-        percentage: 100
-      }))
-    ]);
+    // Start with completely empty list – no example students
+    const students = ref([]);
 
     students.value.forEach(s => {
       s.weekdayPresent = 0;
@@ -430,21 +432,17 @@ createApp({
     const searchText = ref('');
     const currentPage = ref(1);
 
-    // Filtered by search
     const filtered = computed(() => {
       if (!searchText.value.trim()) return students.value;
       const term = searchText.value.toLowerCase().trim();
       return students.value.filter(s => s.name.toLowerCase().includes(term));
     });
 
-    // Paginated view (15 at a time)
     const paginatedStudents = computed(() => {
-      const start = 0;
       const end = currentPage.value * pageSize;
-      return filtered.value.slice(start, end);
+      return filtered.value.slice(0, end);
     });
 
-    // Check if there are more students to load
     const hasMore = computed(() => {
       return paginatedStudents.value.length < filtered.value.length;
     });
@@ -452,17 +450,20 @@ createApp({
     const loadMore = () => {
       if (hasMore.value) {
         currentPage.value++;
-        // Optional: smooth scroll to bottom after load
         setTimeout(() => {
           window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-        }, 100);
+        }, 150);
       }
     };
 
-    const filteredStudents = paginatedStudents; // alias for template
+    const filteredStudents = paginatedStudents;
 
     const exportToExcel = () => {
-      // Export ALL filtered students (not just current page)
+      if (filtered.value.length === 0) {
+        showToast("មិនទាន់មានទិន្នន័យសម្រាប់នាំចេញ", "warning");
+        return;
+      }
+
       const headers = [
         "ល.រ", "ឈ្មោះ", "ភេទ",
         "ចន្ទ", "អង្គារ", "ពុធ", "ព្រហស្បតិ៍", "សុក្រ", "សៅរ៍", "អាទិត្យ",
@@ -472,7 +473,9 @@ createApp({
       const data = filtered.value.map((s, index) => {
         const daysKh = s.days.map(v => v ? "មក" : "អត់");
         return [
-          index + 1, s.name, s.sex,
+          index + 1,
+          s.name,
+          s.sex,
           ...daysKh,
           s.weekdayPresent,
           s.percentage + "%"
@@ -503,7 +506,6 @@ createApp({
       showToast("បាននាំចេញទៅ Excel រួចរាល់", "success");
     };
 
-    // Modal logic (unchanged)
     const modalTitle = ref("បន្ថែមសិស្សថ្មី");
     const modalName = ref("");
     const modalSex = ref("ប្រុស");
@@ -511,7 +513,7 @@ createApp({
 
     const openAddModal = () => {
       modalTitle.value = "បន្ថែមសិស្សថ្មី";
-      modalName.value = "";
+      modalName.value = "";           // Blank every time
       modalSex.value = "ប្រុស";
       editingIndex.value = -1;
       bootstrap.Modal.getOrCreateInstance(document.getElementById("studentModal")).show();
@@ -531,7 +533,13 @@ createApp({
       const name = modalName.value.trim();
 
       if (editingIndex.value === -1) {
-        students.value.push({ name, sex: modalSex.value, days: Array(7).fill(0), weekdayPresent: 0, percentage: 100 });
+        students.value.push({
+          name,
+          sex: modalSex.value,
+          days: Array(7).fill(0),
+          weekdayPresent: 0,
+          percentage: 100
+        });
         showToast("បន្ថែមសិស្សថ្មីជោគជ័យ", "success");
       } else {
         const s = students.value[editingIndex.value];
@@ -579,7 +587,8 @@ createApp({
     };
 
     return {
-      currentYear, currentMonthKh,
+      currentYear,
+      currentMonthKh,
       todayIndex,
       students,
       searchText,
@@ -587,9 +596,15 @@ createApp({
       paginatedStudents,
       hasMore,
       loadMore,
-      modalTitle, modalName, modalSex,
-      openAddModal, openEditModal, saveStudent,
-      confirmDelete, studentToDeleteName, deleteConfirmed,
+      modalTitle,
+      modalName,
+      modalSex,
+      openAddModal,
+      openEditModal,
+      saveStudent,
+      confirmDelete,
+      studentToDeleteName,
+      deleteConfirmed,
       toggleAttendance,
       exportToExcel,
       showToast
